@@ -14,6 +14,7 @@ import org.objectweb.asm.Attribute;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
@@ -40,11 +41,38 @@ public class Main {
 						System.out.println("\tProcessing CLASS: "+entry.getName());
 						ClassReader cr = new ClassReader(zipIn);
 						ClassWriter cw = new ClassWriter(0);
+						final boolean[] skip = new boolean[1];
 						ClassVisitor cv = new ClassVisitor(Opcodes.ASM5, cw) { 
+							@Override
+							public void visit(int version, int access,
+									String name, String signature,
+									String superName, String[] interfaces) {
+								if ((access & (Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED)) == 0){
+									skip[0] = true;
+								}
+								super.visit(version, access, name, signature, superName, interfaces);
+							}
+							
+							@Override
+							public void visitSource(String source, String debug) {
+								// ignore
+							}
+							
+							@Override
+							public FieldVisitor visitField(int access,
+									String name, String desc, String signature,
+									Object value) {
+								if ((access & (Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED)) == 0)
+									return null;
+								return super.visitField(access, name, desc, signature, value);
+							}
+							
 							@Override
 							public MethodVisitor visitMethod(int access,
 									String name, String desc, String signature,
 									String[] exceptions) {
+								if ((access & (Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED)) == 0)
+									return null;
 								return new MethodVisitor(Opcodes.ASM5, super.visitMethod(access, name, desc, signature, exceptions)) {
 									@Override
 									public void visitCode() {
@@ -210,12 +238,14 @@ public class Main {
 							}
 						};
 						cr.accept(cv, 0);
-						byte[] b2 = cw.toByteArray(); // b2 represents the same class as b1
-						entry.setSize(b2.length);
-						entry.setCompressedSize(-1);
-						entry.setMethod(ZipEntry.DEFLATED);
-						zipOut.putNextEntry(entry);
-						new DataOutputStream(zipOut).write(b2);
+						if (!skip[0]) {
+							byte[] b2 = cw.toByteArray(); // b2 represents the same class as b1
+							entry.setSize(b2.length);
+							entry.setCompressedSize(-1);
+							entry.setMethod(ZipEntry.DEFLATED);
+							zipOut.putNextEntry(entry);
+							new DataOutputStream(zipOut).write(b2);
+						}
 					} else {
 						
 					}
