@@ -22,6 +22,8 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.TypePath;
 
 public class Main {
+	private static boolean INCLUDE_PACKAGE_PRIVATE_CLASSES = true;
+	
 	public static void main(String[] args) throws Exception {
 		if (args.length != 2) {
 			System.out.println("Usage: java " + Main.class.getCanonicalName()
@@ -47,7 +49,7 @@ public class Main {
 							public void visit(int version, int access,
 									String name, String signature,
 									String superName, String[] interfaces) {
-								if ((access & (Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED)) == 0){
+								if (!INCLUDE_PACKAGE_PRIVATE_CLASSES && (access & (Opcodes.ACC_PUBLIC | Opcodes.ACC_PROTECTED)) == 0){
 									skip[0] = true;
 								}
 								super.visit(version, access, name, signature, superName, interfaces);
