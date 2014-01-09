@@ -22,7 +22,9 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -45,19 +47,27 @@ public class Main {
 	public static void main(String[] args) throws Exception {
 		if (args.length != 2) {
 			System.out.println("Usage: java " + Main.class.getCanonicalName()
-					+ " <source dir> <dest dir>");
+					+ " <source dir> <dest file>");
 			System.exit(1);
 		}
+		
+		File outFile = new File(args[1]);
+		ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(outFile));
+		zipOut.setLevel(9);
+		Set<String> writtenEntries = new HashSet<String>();
 		for (File file : new File(args[0]).listFiles()) {
 			if (file.getName().toLowerCase(Locale.US).endsWith(".jar")) {
 				System.err.println("Processing JAR: "+file.getPath());
 				ZipInputStream zipIn = new ZipInputStream(new FileInputStream(file));
-				File outFile = new File(args[1], file.getName());
-				ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(outFile));
-				zipOut.setLevel(9);
 				ZipEntry entry;
 				while((entry = zipIn.getNextEntry()) != null) {
 					if (!entry.isDirectory() && entry.getName().toLowerCase(Locale.US).endsWith(".class")) {
+						if (writtenEntries.contains(entry.getName()))
+						{
+							System.out.println("\tIgnoring duplicat CLASS: "+entry.getName());
+							continue;
+						}
+						writtenEntries.add(entry.getName());
 						System.out.println("\tProcessing CLASS: "+entry.getName());
 						ClassReader cr = new ClassReader(zipIn);
 						ClassWriter cw = new ClassWriter(0);
@@ -271,8 +281,8 @@ public class Main {
 					}
 				}
 				zipIn.close();
-				zipOut.close();
 			}
 		}
+		zipOut.close();
 	}
 }
