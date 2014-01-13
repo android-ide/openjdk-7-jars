@@ -18,10 +18,15 @@
 
 package com.appfour.codestripper;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -43,6 +48,7 @@ import org.objectweb.asm.TypePath;
 
 public class Main {
 	private static boolean INCLUDE_PACKAGE_PRIVATE_CLASSES = true;
+	private static boolean INCLUDE_RESOURCES = true;
 	
 	public static void main(String[] args) throws Exception {
 		if (args.length != 2) {
@@ -61,10 +67,11 @@ public class Main {
 				ZipInputStream zipIn = new ZipInputStream(new FileInputStream(file));
 				ZipEntry entry;
 				while((entry = zipIn.getNextEntry()) != null) {
-					if (!entry.isDirectory() && entry.getName().toLowerCase(Locale.US).endsWith(".class")) {
+					if (entry.isDirectory()) continue;
+					if (entry.getName().toLowerCase(Locale.US).endsWith(".class")) {
 						if (writtenEntries.contains(entry.getName()))
 						{
-							System.out.println("\tIgnoring duplicat CLASS: "+entry.getName());
+							System.out.println("\tIgnoring duplicate CLASS: "+entry.getName());
 							continue;
 						}
 						writtenEntries.add(entry.getName());
@@ -277,12 +284,54 @@ public class Main {
 							new DataOutputStream(zipOut).write(b2);
 						}
 					} else {
-						
+						if (writtenEntries.contains(entry.getName()))
+						{
+							System.out.println("\tIgnoring duplicate RESOURCE: "+entry.getName());
+							continue;
+						}
+						ByteArrayOutputStream bos = new ByteArrayOutputStream();
+						transfer(zipIn, bos, false);
+						writtenEntries.add(entry.getName());
+						System.out.println("\tProcessing RESOURCE: "+entry.getName());
+						entry.setSize(bos.size());
+						entry.setCompressedSize(-1);
+						entry.setMethod(ZipEntry.DEFLATED);
+						zipOut.putNextEntry(entry);
+						transfer(new ByteArrayInputStream(bos.toByteArray()), zipOut, false);
 					}
 				}
 				zipIn.close();
 			}
 		}
 		zipOut.close();
+	}
+
+	/** Transfers all data from source to dest. */
+	private static void transfer(InputStream source, OutputStream dest, boolean closeStreams) throws IOException
+	{
+		byte[] buffer = new byte[4096];
+		int count;
+		try
+		{
+			try
+			{
+				while ((count = source.read(buffer)) != -1)
+					dest.write(buffer, 0, count);
+			}
+			finally
+			{
+				if (closeStreams)
+				{
+					source.close();
+				}
+			}
+		}
+		finally
+		{
+			if (closeStreams)
+			{
+				dest.close();
+			}
+		}
 	}
 }
